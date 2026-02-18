@@ -5,7 +5,13 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), nodePolyfills()],
+
   define: {
     global: "globalThis",
+  },
+  server: {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+    },
   },
 });
