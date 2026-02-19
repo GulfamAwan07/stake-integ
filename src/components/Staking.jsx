@@ -4,8 +4,9 @@ import {
   MdKeyboardArrowDown,
   MdOutlineAccountBalanceWallet,
 } from "react-icons/md";
-import { toNano } from "@ton/core";
 import { useTonConnectUI, TonConnectButton } from "@tonconnect/ui-react";
+import { TonClient, JettonMaster, Address, toNano } from "@ton/ton";
+import { getTunaJettonWalletAddress } from "../utils/tonClient";
 
 import {
   getTonBalance,
@@ -63,7 +64,7 @@ export default function Staking() {
     setStatus(null);
     try {
       const payload = buildStakePayload();
-      const totalAmount = (parsedAmount).toFixed(9); // amount + fee
+      const totalAmount = parsedAmount.toFixed(9);
       console.log("Total sending:", totalAmount);
 
       await tonConnectUI.sendTransaction({
@@ -71,7 +72,7 @@ export default function Staking() {
         messages: [
           {
             address: STAKING_CONTRACT,
-            amount: toNano(totalAmount).toString(),
+            amount: toNano("1.05").toString(),
             payload: payload.toBoc().toString("base64"),
           },
         ],
@@ -91,30 +92,50 @@ export default function Staking() {
     }
   };
 
+  // handleUnstake
+
   const handleUnstake = async () => {
-    if (!amount || !wallet) return;
+    if (!amount || !tonConnectUI.wallet) return;
+
     setLoading(true);
     setStatus(null);
+
     try {
+      const jettonWalletAddress = await getTunaJettonWalletAddress(userAddress);
+
+      if (!jettonWalletAddress) {
+        setStatus({
+          type: "error",
+          msg: "Could not find your TUNA jetton wallet.",
+        });
+        return;
+      }
+
       const payload = buildUnstakePayload(amount);
+
       await tonConnectUI.sendTransaction({
         validUntil: Math.floor(Date.now() / 1000) + 60,
         messages: [
           {
-            address: STAKING_CONTRACT,
-            amount: toNano(amount).toString(),
+            address: jettonWalletAddress, // ✅ now a proper address string
+            amount: toNano("1.05").toString(),
             payload: payload.toBoc().toString("base64"),
           },
         ],
       });
+
       setAmount("");
       setStatus({
         type: "success",
-        msg: `Successfully unstaked ${amount} KTON`,
+        msg: `Successfully requested unstake for ${amount} TUNA`,
       });
       setTimeout(loadBalances, 10000);
     } catch (err) {
-      setStatus({ type: "error", msg: err?.message || "Transaction rejected" });
+      console.error("Unstake Error:", err);
+      setStatus({
+        type: "error",
+        msg: err?.message || "Transaction rejected or failed",
+      });
     } finally {
       setLoading(false);
     }
@@ -122,8 +143,8 @@ export default function Staking() {
 
   const isStake = mode === "stake";
   const activeBal = isStake ? tonBalance : stakedBalance;
-  const activeTicker = isStake ? "TON" : "KTON";
-  const receiveTicker = isStake ? "KTON" : "TON";
+  const activeTicker = isStake ? "TON" : "TUNA";
+  const receiveTicker = isStake ? "TUNA" : "TON";
   const isDisabled = loading || !wallet || !amount || Number(amount) <= 0;
 
   return (
@@ -249,7 +270,7 @@ export default function Staking() {
             {
               label: "Staked Balance",
               value: stakedBalance,
-              ticker: "KTON",
+              ticker: "TUNA",
               color: "#a78bfa",
             },
           ].map(({ label, value, ticker, color }) => (
@@ -464,7 +485,6 @@ export default function Staking() {
             </div>
           </div>
 
-          {/* swap arrow */}
           <div
             style={{
               display: "flex",
@@ -634,7 +654,7 @@ export default function Staking() {
                 fontFamily: "monospace",
               }}
             >
-              1 TON ≈ 0.999 KTON
+              1 TON ≈ 0.999 TUNA
             </span>
             <div
               style={{
